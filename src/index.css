@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+@theme {
+  --font-family-sans: 'Tajawal', sans-serif;
+  --font-tajawal: 'Tajawal', sans-serif;
+}
+
+:root {
+  font-family: 'Tajawal', sans-serif;
+}
