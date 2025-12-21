@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import type { PricingState, PricingResult } from '../types/pricing';
+import type { PricingState, PricingResult, ReportContent } from '../types/pricing';
 
 export async function generatePricing(
   state: PricingState
@@ -85,5 +85,62 @@ export async function generatePricing(
     throw new Error(
       'فشل في توليد التسعير. يرجى التحقق من مفتاح API أو صيغة الطلب.'
     );
+  }
+}
+
+export async function generateReportNarrative(
+  packages: PricingResult['packages'],
+  clientName: string,
+  customNotes: string
+): Promise<ReportContent> {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!apiKey) throw new Error('API Key is missing');
+
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+
+  const prompt = `
+تصرف بصفتك مستشار أعمال محترف يكتب مقترحاً رسمياً لعميل.
+العميل: ${clientName}
+المشروع: تطوير برمجيات/موقع
+
+الباقات المقترحة:
+1. الاقتصادية: ${packages.economic.name} - ${packages.economic.price}
+2. القياسية: ${packages.standard.name} - ${packages.standard.price}
+3. المميزة: ${packages.premium.name} - ${packages.premium.price}
+
+ملاحظات خاصة من المستخدم للتركيز عليها: "${customNotes}"
+
+المطلوب:
+كتابة محتوى لتقرير PDF احترافي يتكون من:
+1. مقدمة: ترحيب احترافي وتمهيد للمقترح (حوالي 50 كلمة).
+2. نقاط مخصصة (Custom Sections): بناءً على "الملاحظات الخاصة"، اكتب 2-3 أقسام قصيرة (عنوان + محتوى) توضح كيف سيلبي الحل احتياجات العميل. إذا لم توجد ملاحظات، اكتب عن "الجودة" و"الدعم الفني".
+3. خاتمة: دعوة لاتخاذ إجراء وشكر (حوالي 30 كلمة).
+
+المخرجات JSON فقط:
+{
+  "introduction": "...",
+  "customSections": [
+    { "title": "...", "content": "..." }
+  ],
+  "conclusion": "..."
+}
+`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    const jsonString = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    return JSON.parse(jsonString) as ReportContent;
+  } catch (error) {
+    console.error('Report Generation Error:', error);
+    return {
+      introduction: `يسعدنا تقديم عرض السعر هذا لـ ${clientName}. لقد قمنا بدراسة متطلباتكم بعناية واقترحنا الحلول التالية لتلبية احتياجاتكم بأفضل كفاءة وجودة.`,
+      customSections: [
+        { title: 'ضمان الجودة', content: 'نلتزم بأعلى معايير الجودة في كتابة الكود والتصميم لضمان استقرار النظام وسهولة صيانته مستقبلاً.' },
+        { title: 'الدعم الفني', content: 'نوفر خدمة دعم فني متميز لضمان عمل النظام بكفاءة ومعالجة أي استفسارات قد تطرأ بعد التسليم.' }
+      ],
+      conclusion: 'نتطلع للعمل معكم وتحقيق رؤيتكم. لا تترددوا في مناقشة أي تفاصيل إضافية لتعديل العرض بما يناسبكم.'
+    };
   }
 }

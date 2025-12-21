@@ -23,6 +23,12 @@ export interface PricingResult {
   currency: string;
 }
 
+export interface ReportContent {
+  introduction: string;
+  customSections: { title: string; content: string }[];
+  conclusion: string;
+}
+
 
 export interface ServiceInfo {
   serviceType: string;

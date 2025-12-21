@@ -1,7 +1,12 @@
 import { useEffect, useState, useRef } from 'react';
 import { usePricing } from '../context/PricingContext';
-import { generatePricing } from '../services/aiPricing';
-import { CheckCircle2, Copy, RotateCcw, ArrowRight, Sparkles, Search, Calculator, Globe } from 'lucide-react';
+import { generatePricing, generateReportNarrative } from '../services/aiPricing';
+import { CheckCircle2, Copy, RotateCcw, ArrowRight, Sparkles, Search, Calculator, Globe, FileText } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+import PricingReportTemplate from './PricingReportTemplate';
+import ReportConfigModal from './ReportConfigModal';
+import type { ReportContent } from '../types/pricing';
 
 interface AILoadingStateProps {
   onComplete: () => void;
@@ -81,6 +86,13 @@ export default function PricingResults() {
   // New state to coordinate animation
   const [dataReady, setDataReady] = useState(!!state.pricingResult);
 
+  // Report State
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [reportContent, setReportContent] = useState<ReportContent | null>(null);
+  const [reportClientName, setReportClientName] = useState('');
+  const [reportProjectName, setReportProjectName] = useState('');
+
   const isFetching = useRef(false);
 
   // Function to perform the fetch
@@ -121,6 +133,90 @@ export default function PricingResults() {
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.pricingResult]);
+
+  const generatePDF = async () => {
+    const input = document.getElementById('pricing-report-template');
+    if (!input) return;
+
+    try {
+      // Small delay to ensure render
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const canvas = await html2canvas(input, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      const imgWidth = 210;
+      const pageHeight = 297;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      // Add first page
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      // Add subsequent pages if needed
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight; // This calculation is tricky in loops, simpler approach:
+        // Actually for simple top-down slicing:
+        position = -(pageHeight * (Math.ceil((imgHeight - heightLeft) / pageHeight)));
+
+        pdf.addPage();
+        // We shift the image up to show the next section
+        // Note: position needs to be negative to move image up
+        // Cycle 1: -297, Cycle 2: -594...
+        const currentCycle = Math.ceil((imgHeight - heightLeft) / pageHeight);
+        pdf.addImage(imgData, 'PNG', 0, -(pageHeight * currentCycle), imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      const fileName = `عرض_سعر_${reportClientName.replace(/\s+/g, '_')}.pdf`;
+      pdf.save(fileName);
+    } catch (err) {
+      console.error('PDF Generation Error:', err);
+      alert('حدث خطأ أثناء إنشاء ملف PDF');
+    } finally {
+      setIsGeneratingReport(false);
+      setShowReportModal(false);
+    }
+  };
+
+  useEffect(() => {
+    if (reportContent && isGeneratingReport) {
+      generatePDF();
+    }
+  }, [reportContent]);
+
+  const handleGenerateReport = async (clientName: string, notes: string) => {
+    if (!state.pricingResult) return;
+
+    setIsGeneratingReport(true);
+    setReportClientName(clientName);
+
+    try {
+      const content = await generateReportNarrative(
+        state.pricingResult.packages,
+        clientName,
+        notes
+      );
+      setReportContent(content);
+      // PDF generation triggered by useEffect when content is set
+    } catch (err) {
+      console.error('Report AI Error:', err);
+      setIsGeneratingReport(false);
+      alert('حدث خطأ أثناء توليد محتوى التقرير');
+    }
+  };
 
   const copyJustification = () => {
     if (state.pricingResult) {
@@ -206,6 +302,33 @@ export default function PricingResults() {
         </div>
 
       </div>
+
+      <div className="flex justify-end mb-6">
+        <button
+          onClick={() => setShowReportModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-sm transition-all"
+        >
+          <FileText className="w-4 h-4" />
+          تحميل العرض كملف PDF
+        </button>
+      </div>
+
+      <ReportConfigModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        onGenerate={handleGenerateReport}
+        isGenerating={isGeneratingReport}
+      />
+
+      {/* Hidden Report Template */}
+      {state.pricingResult && reportContent && (
+        <PricingReportTemplate
+          result={state.pricingResult}
+          reportContent={reportContent}
+          clientName={reportClientName}
+          projectName={reportProjectName}
+        />
+      )}
 
       <div className="grid md:grid-cols-3 gap-6 mb-8">
         {/* Economic */}
