@@ -1,4 +1,5 @@
 import type { PricingResult, ReportContent } from '../types/pricing';
+import type { BrandingSettings } from '../types/BrandingSettings';
 import { CheckCircle2 } from 'lucide-react';
 
 interface PricingReportTemplateProps {
@@ -6,6 +7,7 @@ interface PricingReportTemplateProps {
   reportContent: ReportContent;
   clientName: string;
   projectName: string;
+  branding: BrandingSettings;
 }
 
 export default function PricingReportTemplate({
@@ -13,6 +15,7 @@ export default function PricingReportTemplate({
   reportContent,
   clientName,
   projectName,
+  branding,
 }: PricingReportTemplateProps) {
   return (
     <div
@@ -167,12 +170,20 @@ export default function PricingReportTemplate({
       <div className="pt-8 text-center text-sm" style={{ borderTop: '1px solid #e5e7eb', color: '#6b7280' }}>
         <p>{reportContent.conclusion}</p>
         <div className="mt-4 flex justify-between items-center p-4 rounded-lg" style={{ backgroundColor: '#111827', color: '#ffffff' }}>
-          <div className="font-bold text-lg">ArabixDev</div>
-          <div className="text-left">
-            <div>arabixdev@gmail.com</div>
-            <div className="text-xs text-right" style={{ color: '#9ca3af' }}>
-              تم التوليد بواسطة منصة التسعير الذكي
-            </div>
+          <div className="flex items-center gap-3">
+            {branding.logo && (
+              <img
+                src={branding.logo}
+                alt="Company Logo"
+                style={{ height: '40px', maxWidth: '120px', objectFit: 'contain' }}
+              />
+            )}
+            <div className="font-bold text-lg">{branding.companyName}</div>
+          </div>
+          <div className="text-left text-sm">
+            <div>{branding.email}</div>
+            {branding.phone && <div>{branding.phone}</div>}
+            {branding.website && <div className="text-xs" style={{ color: '#9ca3af' }}>{branding.website}</div>}
           </div>
         </div>
       </div>

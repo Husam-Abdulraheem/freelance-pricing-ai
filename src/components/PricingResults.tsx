@@ -1,12 +1,15 @@
 import { useEffect, useState, useRef } from 'react';
 import { usePricing } from '../context/PricingContext';
 import { generatePricing, generateReportNarrative } from '../services/aiPricing';
-import { CheckCircle2, Copy, RotateCcw, ArrowRight, Sparkles, Search, Calculator, Globe, FileText } from 'lucide-react';
+import { CheckCircle2, Copy, RotateCcw, ArrowRight, Sparkles, Search, Calculator, Globe, FileText, History } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import PricingReportTemplate from './PricingReportTemplate';
 import ReportConfigModal from './ReportConfigModal';
+import HistoryPanel from './HistoryPanel';
 import type { ReportContent } from '../types/pricing';
+import type { BrandingSettings } from '../types/BrandingSettings';
+import { saveToHistory } from '../services/historyStorage';
 
 interface AILoadingStateProps {
   onComplete: () => void;
@@ -92,6 +95,8 @@ export default function PricingResults() {
   const [reportContent, setReportContent] = useState<ReportContent | null>(null);
   const [reportClientName, setReportClientName] = useState('');
   const [reportProjectName, setReportProjectName] = useState('');
+  const [reportBranding, setReportBranding] = useState<BrandingSettings | null>(null);
+  const [showHistoryPanel, setShowHistoryPanel] = useState(false);
 
   const isFetching = useRef(false);
 
@@ -197,11 +202,26 @@ export default function PricingResults() {
     }
   }, [reportContent]);
 
-  const handleGenerateReport = async (clientName: string, notes: string) => {
+  const handleGenerateReport = async (
+    clientName: string,
+    projectName: string,
+    notes: string,
+    branding: BrandingSettings
+  ) => {
     if (!state.pricingResult) return;
 
     setIsGeneratingReport(true);
     setReportClientName(clientName);
+    setReportProjectName(projectName);
+    setReportBranding(branding);
+
+    // Save to history immediately when user confirms report generation
+    saveToHistory({
+      clientName: clientName,
+      projectName: projectName,
+      state: state,
+      result: state.pricingResult,
+    });
 
     try {
       const content = await generateReportNarrative(
@@ -303,7 +323,14 @@ export default function PricingResults() {
 
       </div>
 
-      <div className="flex justify-end mb-6">
+      <div className="flex justify-between items-center mb-6">
+        <button
+          onClick={() => setShowHistoryPanel(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 shadow-sm transition-all"
+        >
+          <History className="w-4 h-4" />
+          سجل التسعيرات
+        </button>
         <button
           onClick={() => setShowReportModal(true)}
           className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-sm transition-all"
@@ -320,13 +347,19 @@ export default function PricingResults() {
         isGenerating={isGeneratingReport}
       />
 
+      <HistoryPanel
+        isOpen={showHistoryPanel}
+        onClose={() => setShowHistoryPanel(false)}
+      />
+
       {/* Hidden Report Template */}
-      {state.pricingResult && reportContent && (
+      {state.pricingResult && reportContent && reportBranding && (
         <PricingReportTemplate
           result={state.pricingResult}
           reportContent={reportContent}
           clientName={reportClientName}
           projectName={reportProjectName}
+          branding={reportBranding}
         />
       )}
 

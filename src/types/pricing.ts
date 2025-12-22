@@ -1,3 +1,5 @@
+import type { BrandingSettings } from './BrandingSettings';
+
 export type Complexity = 'simple' | 'medium' | 'complex';
 export type DeliverySpeed = 'normal' | 'urgent';
 export type MarketType = 'local' | 'regional' | 'global';
@@ -69,6 +71,7 @@ export interface PricingState {
   freelancerProfile: FreelancerProfile;
   marketInfo: MarketInfo;
   pricingResult?: PricingResult;
+  brandingSettings?: BrandingSettings;
 }
 
 export const INITIAL_STATE: PricingState = {
